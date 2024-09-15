@@ -14,7 +14,7 @@ on:
           - major
           - minor
           - patch
-        required: false
+        required: true
       bump_type_pre_release:
         type: choice
         description: 'Pre-release type'
@@ -25,7 +25,7 @@ on:
           - rc
           - post
           - dev
-        required: false
+        required: true
 env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
@@ -60,18 +60,18 @@ jobs:
         id: bump_version
         run: |
           if [ "${{ github.event.inputs.bump_type }}" == "none (pre-release only)" ]; then
-            hatch version bump ${{ github.event.inputs.bump_type_pre_release }}
+            hatch version ${{ github.event.inputs.bump_type_pre_release }}
           else
-            hatch version bump ${{ github.event.inputs.bump_type }},${{ github.event.inputs.bump_type_pre_release }}
+            hatch version ${{ github.event.inputs.bump_type }},${{ github.event.inputs.bump_type_pre_release }}
           fi
           echo "BUMPED_VERSION=$(hatch version)" >> $GITHUB_OUTPUT
       - name: 📝 create changelog
         run: |
-          git-cliff -s header --current -t ${{ steps.bump_version.outputs.BUMPED_VERSION }} > release_body.md
-          git-cliff > CHANGELOG.md
+          git-cliff -s header --unreleased -t ${{ steps.bump_version.outputs.BUMPED_VERSION }} > release_body.md
+          git-cliff -t ${{ steps.bump_version.outputs.BUMPED_VERSION }} > CHANGELOG.md
       - name: 📤 push changes
         run: |
-          git add .
+          git add CHANGELOG.md */__init__.py
           git commit -m "chore(release): ${{ steps.bump_version.outputs.BUMPED_VERSION }}"
           git push origin main
       - name: create release
@@ -79,14 +79,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
-          name: simulat ${{ steps.bump_version.outputs.BUMPED_VERSION }}
+          name: ${{ github.event.repository.name }} ${{ steps.bump_version.outputs.BUMPED_VERSION }}
           tag_name: ${{ steps.bump_version.outputs.BUMPED_VERSION }}
           body_path: release_body.md
           prerelease: ${{ github.event.inputs.bump_type_pre_release != 'release' }}
           discussion_category_name: 'Announcements'
       - name: 🧹 cleanup
         run: |
-          rm body.md
+          rm release_body.md
       - name: 📤 merge into develop
         run: |
           git checkout develop
