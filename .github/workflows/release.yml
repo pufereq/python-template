@@ -3,20 +3,29 @@ name: Bump version
 on:
   workflow_dispatch:
     inputs:
-      version:
-        type: string
-        description: 'new tag number'
-        required: true
-      pre_release:
-        type: boolean
-        description: 'pre-release?'
-        required: true
       description:
-        type: string
-        description: 'version description'
+        description: 'Release description'
         required: true
-
-
+      bump_type:
+        type: choice
+        description: 'Bump type'
+        options:
+          - none (pre-release only)
+          - major
+          - minor
+          - patch
+        required: false
+      bump_type_pre_release:
+        type: choice
+        description: 'Pre-release type'
+        options:
+          - release
+          - alpha
+          - beta
+          - rc
+          - post
+          - dev
+        required: false
 env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
@@ -31,42 +40,49 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "GH_TOKEN=${GITHUB_TOKEN}" >> $GITHUB_ENV
       - name: 🔀 checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: "${{ env.GH_TOKEN }}"
       - name: 🐍 python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: '3.x'
           cache: pip
-      - name: node
-        uses: actions/setup-node@v2
-        continue-on-error: true
-        with:
-          node-version: 16
-          cache: npm
       - name: 📦 install required utilities
         run: |
-          pip install git-cliff --break-system-packages
-          npm install -g release-it
+          pip install git-cliff hatch --break-system-packages
       - name: configure git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      - name: 📝 bump version
+      - name: 📦 bump version
+        id: bump_version
         run: |
-          git-cliff -s header -t ${{ github.event.inputs.version }} -u -o body.md
-          release-it ${{ github.event.inputs.version }}
+          if [ "${{ github.event.inputs.bump_type }}" == "none (pre-release only)" ]; then
+            hatch version bump ${{ github.event.inputs.bump_type_pre_release }}
+          else
+            hatch version bump ${{ github.event.inputs.bump_type }},${{ github.event.inputs.bump_type_pre_release }}
+          fi
+          echo "BUMPED_VERSION=$(hatch version)" >> $GITHUB_OUTPUT
+      - name: 📝 create changelog
+        run: |
+          git-cliff -s header --current -t ${{ steps.bump_version.outputs.BUMPED_VERSION }} > release_body.md
+          git-cliff > CHANGELOG.md
+      - name: 📤 push changes
+        run: |
+          git add .
+          git commit -m "chore(release): ${{ steps.bump_version.outputs.BUMPED_VERSION }}"
+          git push origin main
       - name: create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
-          name: simulat ${{ github.event.inputs.version }} - ${{ github.event.inputs.description}}
-          tag_name: ${{ github.event.inputs.version }}
-          body_path: body.md
-          prerelease: ${{ github.event.inputs.pre_release }}
+          name: simulat ${{ steps.bump_version.outputs.BUMPED_VERSION }}
+          tag_name: ${{ steps.bump_version.outputs.BUMPED_VERSION }}
+          body_path: release_body.md
+          prerelease: ${{ github.event.inputs.bump_type_pre_release != 'release' }}
           discussion_category_name: 'Announcements'
       - name: 🧹 cleanup
         run: |
