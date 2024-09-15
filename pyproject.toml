@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = ""
+dynamic = ["version"]
+depedencies = [
+    "...",
+]
+requires-python = ">=3.9"
+authors = [
+    {name="Artur Borecki", email="me@pufereq.pl"}
+]
+description = "..."
+readme = "README.md"
+keywords = ["..."]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "...",
+]
+
+[project.urls]
+Homepage = "..."
+Repository = "..."
+"Bug Tracker" = "..."
+Changelog = "..."
+
+[project.optional-dependencies]
+dev = [
+    "hatchling",
+    "pytest",
+    "pytest-cov",
+    "black",
+]
+
+[tool.hatch.version]
+path = ".../__init__.py"
+pattern = "__version__ = \"(?P<version>.*)\""
