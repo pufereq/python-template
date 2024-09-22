@@ -3,28 +3,19 @@ name: Bump version
 on:
   workflow_dispatch:
     inputs:
-      description:
-        description: 'Release description'
-        required: true
       bump_type:
         type: choice
-        description: 'Bump type'
-        options:
-          - none (pre-release only)
-          - major
-          - minor
-          - patch
+        description: 'Type of bump'
         required: true
-      bump_type_pre_release:
-        type: choice
-        description: 'Pre-release type'
         options:
-          - release
-          - alpha
-          - beta
-          - rc
-          - post
-          - dev
+          - 'patch'
+          - 'minor'
+          - 'major'
+          - 'pre_l'
+          - 'pre_n'
+      short_description:
+        type: string
+        description: 'Short description of the release'
         required: true
 env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -49,9 +40,12 @@ jobs:
         with:
           python-version: '3.x'
           cache: pip
-      - name: 📦 install required utilities
-        run: |
-          pip install git-cliff hatch --break-system-packages
+      - name: 📦 setup pdm
+        uses: pdm-project/setup-pdm@v4
+        with:
+          cache: true
+      - name: 📦 install dependencies
+        run: pdm install
       - name: configure git
         run: |
           git config --global user.name "github-actions[bot]"
@@ -59,19 +53,16 @@ jobs:
       - name: 📦 bump version
         id: bump_version
         run: |
-          if [ "${{ github.event.inputs.bump_type }}" == "none (pre-release only)" ]; then
-            hatch version ${{ github.event.inputs.bump_type_pre_release }}
-          else
-            hatch version ${{ github.event.inputs.bump_type }},${{ github.event.inputs.bump_type_pre_release }}
-          fi
-          echo "BUMPED_VERSION=$(hatch version)" >> $GITHUB_OUTPUT
+          bump-my-version ${{ github.event.inputs.bump_type }}
+          echo "BUMPED_VERSION=$(cat ${{ github.event.repository.name }}/__init__.py | grep __version__ | cut -d '"' -f 2)" >> $GITHUB_ENV
       - name: 📝 create changelog
         run: |
           git-cliff -s header --unreleased -t ${{ steps.bump_version.outputs.BUMPED_VERSION }} > release_body.md
+          echo "Changes:" && cat release_body.md
           git-cliff -t ${{ steps.bump_version.outputs.BUMPED_VERSION }} > CHANGELOG.md
       - name: 📤 push changes
         run: |
-          git add CHANGELOG.md */__init__.py
+          git add CHANGELOG.md ${{ github.event.repository.name }}/__init__.py
           git commit -m "chore(release): ${{ steps.bump_version.outputs.BUMPED_VERSION }}"
           git push origin main
       - name: create release
@@ -79,10 +70,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
-          name: ${{ github.event.repository.name }} ${{ steps.bump_version.outputs.BUMPED_VERSION }}
+          name: ${{ github.event.repository.name }} ${{ steps.bump_version.outputs.BUMPED_VERSION }} - ${{ github.event.inputs.bump_type }}
           tag_name: ${{ steps.bump_version.outputs.BUMPED_VERSION }}
           body_path: release_body.md
-          prerelease: ${{ github.event.inputs.bump_type_pre_release != 'release' }}
+          prerelease: ${{ github.event.inputs.bump_type == 'pre_l' || github.event.inputs.bump_type == 'pre_n' }}
           discussion_category_name: 'Announcements'
       - name: 🧹 cleanup
         run: |
