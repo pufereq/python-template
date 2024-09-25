@@ -103,7 +103,7 @@ jobs:
 
       - name: 📤 push changes
         run: |
-          git add CHANGELOG.md ${{ github.event.repository.name }}/__init__.py
+          git add CHANGELOG.md pyproject.toml ${{ github.event.repository.name }}/__init__.py
           git commit -m "chore(release): ${{ steps.get_version.outputs.BUMPED_VERSION }}"
           git push origin main
 
