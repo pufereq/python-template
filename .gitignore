@@ -24,6 +24,10 @@ venv.bak/
 .pdm*
 !pdm.lock
 
+# uv
+.python-version
+!uv.lock
+
 # Distribution / packaging
 dist/
 build/
