@@ -1,4 +1,4 @@
-name: Code coverage
+name: PR Checks
 
 on:
   pull_request:
@@ -7,41 +7,40 @@ on:
 
 jobs:
   comment_coverage:
+    name: Comment coverage on PR
     runs-on: ubuntu-latest
     steps:
-      - name: GH_TOKEN
-        if: env.GH_TOKEN == ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "GH_TOKEN=${GITHUB_TOKEN}" >> $GITHUB_ENV
-
       - name: 🔀 checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: "${{ env.GH_TOKEN }}"
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          submodules: 'recursive'
+
+      - name: 📦 install uv
+        uses: astral-sh/setup-uv@v5
 
       - name: 🐍 python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version-file: "pyproject.toml"
 
-      - name: 📦 setup pdm
-        uses: pdm-project/setup-pdm@v4
-        with:
-          cache: true
-
-      - name: 📦 install dependencies
+      - name: 📦 sync depedencies
         run: |
-          pdm install
+          uv sync
+          uv sync --group test
+
 
       - name: configure git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: 🧪 run coverage
         run: |
-          pdm run pytest --cov --junitxml=pytest.xml --cov-report=term-missing | tee pytest-coverage.txt
+          uv run pytest --cov --junitxml=pytest.xml --cov-report=term-missing | tee pytest-coverage.txt
+        continue-on-error: true
+
       - name: 📊 comment coverage
         uses: MishaKav/pytest-coverage-comment@main
         with:
