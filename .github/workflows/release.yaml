@@ -115,14 +115,11 @@ jobs:
           rm release_body.md
 
       - name: 📤 merge into develop
+        continue-on-error: true
         run: |
-          if git show-ref --quiet refs/heads/develop; then
-            git checkout develop
-            git merge main
-            git push origin develop
-          else
-            echo "develop doesn't exist, skipping..."
-          fi
+          git checkout develop
+          git merge main
+          git push origin develop
 
       - name: ✅ done
         run: echo "done"
